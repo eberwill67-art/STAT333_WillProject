@@ -1,0 +1,37 @@
+---
+title: "NFL Deliverable @"
+author: "Will and AJ"
+date: "2026-04-18"
+output: html_document
+---
+# Introduction
+Our question of interest is the what parameters are most responsoible for determining if a NFL team will have a winnin season or not. For the purposes of our models we have also called a season with an equal number of wins and losses i.e. 8-8-1 a winning season. 
+```{r setup, include=FALSE}
+library(tidyverse)
+library(GGally)
+library(MASS)
+nfl_data <- read.csv("https://data.scorenetwork.org/data/nfl-team-statistics.csv")
+
+
+nfl_data$win_diff <- nfl_data$wins - nfl_data$losses
+
+nfl_data$winning_record <- ifelse(nfl_data$win_diff >= 0, 1, 0)
+
+str(nfl_data)
+
+```
+
+
+Through our literature review it was previously theorized that turnovers were of large importance. We decided to put this to the test with a simple linear regression model.
+
+```{r}
+nfl_data$turnovers <- nfl_data$offense_n_interceptions +
+                      nfl_data$offense_n_fumbles_lost_pass +
+                      nfl_data$offense_n_fumbles_lost_run
+
+turnover_model <- lm(wins ~ offense_ave_yards_gained_pass +
+          offense_ave_yards_gained_run +
+          turnovers,
+   data = nfl_data)
+summary(turnover_model)
+```
