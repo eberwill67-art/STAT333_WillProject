@@ -1,5 +1,5 @@
 ---
-title: "NFL Deliverable 2"
+title: "NFL Deliverable - Descriptive Analytics"
 author: "Will and AJ"
 date: "2026-04-18"
 output: html_document
