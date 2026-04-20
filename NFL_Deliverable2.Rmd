@@ -17,6 +17,11 @@ nfl_data$win_diff <- nfl_data$wins - nfl_data$losses
 
 nfl_data$winning_record <- ifelse(nfl_data$win_diff >= 0, 1, 0)
 
+
+nfl_data <- nfl_data %>%
+  filter(season >= 2006)
+
+
 str(nfl_data)
 
 ```
