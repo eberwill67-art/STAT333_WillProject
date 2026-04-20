@@ -12,6 +12,18 @@ The dataset used in this analysis contains team-level statistics for NFL seasons
 Although the dataset includes observations beginning in 1999, we restricted the analysis to seasons beginning in 2006. The earlier seasons contained missing or incomplete values for several variables that were important for our analysis. Because incomplete data can bias regression estimates and reduce model reliability, we filtered the dataset to include only seasons from 2006 onward, ensuring that all relevant variables were consistently recorded. This filtering step improved data quality and ensured that comparisons across teams and seasons were based on complete information.
 
 
+## Linear regression results
+The results indicate that average passing yards gained per play and turnovers are statistically significant predictors of the number of wins in a season. The coefficient for passing efficiency (2.00173) suggests that, holding other variables constant, an increase of one yard per play in average passing yards is associated with approximately 2.00 additional wins in a season. This shows that passing efficiency plays a important role in determining team success. The turnovers variable has a negative coefficient (-0.15925), indicating that each additional turnover is associated with approximately 0.16 fewer wins per season, holding other variables constant. This provides strong evidence that avoiding turnovers is an important factor in improving team performance.
+
+Average rushing yards gained per play was not statistically significant (p = 0.215), suggesting that after accounting for passing efficiency and turnovers, rushing efficiency does not have strong evidence of a meaningful linear relationship with the number of wins. The model explains approximately 47.6% of the variability in team wins, indicating that nearly half of the variation in season wins can be explained by these predictors. The overall F-test indicates that the model provides a significantly better fit than a model with no predictors, suggesting that these variables collectively help explain differences in team success across seasons.
+
+
+## Binomial results
+The results indicate that average passing yards gained per play and turnovers are statistically significant predictors of whether a team finishes with a winning season. The positive coefficient for passing efficiency (1.55475) suggests that teams that gain more passing yards per play are substantially more likely to have winning seasons. Holding other variables constant, an increase of one yard per play in passing multiplies the odds of a winning season by e^1.55475 ≈ 4.73, meaning the odds of a winning season increase by approximately 373%. The turnovers variable has a negative coefficient (-0.09195), indicating that committing more turnovers significantly decreases the likelihood of finishing with a winning season. Specifically, each additional turnover multiplies the odds of a winning season by e^−0.09195 ≈ 0.912, corresponding to about an 8.8% decrease in the odds of a winning season.
+
+Average rushing yards gained per play is not statistically significant, indicating there is insufficient evidence to conclude that rushing efficiency meaningfully affects whether a team has a winning season after accounting for passing efficiency and turnovers. Overall, these findings again support the idea that turnovers play an important role in team success, while also reinforcing the strong importance of passing efficiency in determining season outcomes.
+
+
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(GGally)
