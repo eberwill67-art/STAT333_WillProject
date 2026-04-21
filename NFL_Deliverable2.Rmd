@@ -7,9 +7,14 @@ output: html_document
 # Introduction
 Our question of interest is the what parameters are most responsoible for determining if a NFL team will have a winnin season or not. For the purposes of this study, a winning season is defined as a season in which a team finishes with at least as many wins as losses. Therefore, seasons with records such as 8–8 or 8–8–1 are classified as winning seasons. We created a binary variable called winning_record, where a value of 1 indicates a winning season and a value of 0 indicates a losing season.
 
-# Data
+# Data description
 The dataset used in this analysis contains team-level statistics for NFL seasons, including offensive and defensive performance measures such as passing efficiency, rushing efficiency, scoring statistics, and turnovers. These data were obtained from an online sports analytics database containing yearly team performance statistics.
+
 Although the dataset includes observations beginning in 1999, we restricted the analysis to seasons beginning in 2006. The earlier seasons contained missing or incomplete values for several variables that were important for our analysis. Because incomplete data can bias regression estimates and reduce model reliability, we filtered the dataset to include only seasons from 2006 onward, ensuring that all relevant variables were consistently recorded. This filtering step improved data quality and ensured that comparisons across teams and seasons were based on complete information.
+
+After filtering the dataset, we constructed a turnovers variable by combining several turnover-related statistics:
+Turnovers = Interceptions+ Fumbles Lost (Pass)+ Fumbles Lost (Run)
+Turnovers represent the number of times a team loses possession of the ball to the opposing team and are expected to negatively affect team performance. We also created a variable called win_diff, defined as the difference between total wins and total losses. This variable was used to create the binary outcome variable winning_record.
 
 
 ## Linear regression results
