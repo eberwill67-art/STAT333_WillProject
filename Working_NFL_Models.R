@@ -1,6 +1,9 @@
 library(tidyverse)
 library(MASS)
 library(nlme)
+library(GGally)
+library(car)
+
 
 nfl_data <- read.csv("nfl-team-statistics.csv") %>%
   filter(season >= 2006) %>%   # removes structural missingness years
@@ -51,6 +54,20 @@ linear_model <- lm(
 summary(linear_model)
 
 
+# predicted values (linear regression)
+nfl_data$pred_wins <- predict(turnover_model)
+
+# plot
+ggplot(nfl_data, aes(x = pred_wins, y = wins)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(title = "Predicted vs Actual Wins (Linear Regression)",
+       x = "Predicted Wins",
+       y = "Actual Wins") +
+  theme_minimal()
+
+
+
 #Logistic
 logistic_model <- glm(
   winning_record ~ offense_ave_yards_gained_pass +
@@ -62,6 +79,18 @@ logistic_model <- glm(
 )
 
 summary(logistic_model)
+
+
+# predicted vs actual (logit model)
+nfl_data$pred_prob <- predict(logit_model, type = "response")
+
+# plot
+ggplot(nfl_data, aes(x = pred_prob, y = winning_record)) +
+  geom_jitter(height = 0.05, alpha = 0.6) +
+  labs(title = "Predicted Probability vs Actual Winning Season",
+       x = "Predicted Probability of Winning Season",
+       y = "Actual Winning Season (0 = No, 1 = Yes)") +
+  theme_minimal()
 
 
 
