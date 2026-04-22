@@ -1,0 +1,165 @@
+---
+title: "NFL Descriptive Analytics"
+author: "Will and AJ"
+date: "2026-04-22"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.align = "center")
+library(tidyverse)
+library(MASS)
+library(nlme)
+library(knitr)
+```
+# Research Question and Data
+
+Our research question is: **which team-level performance measures are most strongly associated with NFL success, and which of these measures may help predict whether a team finishes with a winning season?** For this study, a winning season is defined as any season in which a team finishes with at least as many wins as losses, so records such as 8--8 and 8--8--1 are classified as winning seasons.
+
+The dataset contains NFL team-level seasonal statistics, including offensive production, turnovers, and scoring-related measures. Although the original data begin in 1999, we restrict attention to seasons from **2006 onward** because earlier seasons contain missing values in several variables central to our analysis. This appears to reflect structural missingness rather than random missingness, so removing those early seasons improves the consistency and comparability of the data. In addition, the modern NFL differs meaningfully from earlier periods because of rule changes and a greater emphasis on passing offense.
+
+```{r data-prep}
+nfl_data <- read.csv("nfl-team-statistics.csv") %>%
+  filter(season >= 2006) %>%
+  mutate(
+    wins = as.numeric(wins),
+    losses = as.numeric(losses),
+    ties = as.numeric(ties),
+    win_diff = wins - losses,
+    winning_record = ifelse(win_diff >= 0, 1, 0),
+    win_pct = (wins + 0.5 * ties) / (wins + losses + ties),
+    turnovers = offense_n_interceptions +
+      offense_n_fumbles_lost_pass +
+      offense_n_fumbles_lost_run
+  )
+```
+We focus on a smaller group of variables that capture distinct dimensions of team performance while limiting multicollinearity. Passing efficiency is measured by average passing yards gained per play, rushing efficiency by average rushing yards gained per play, and ball security by the turnover variable defined as
+
+\[
+\text{Turnovers}
+=
+\text{offense\_n\_interceptions}
++
+\text{offense\_n\_fumbles\_lost\_pass}
++
+\text{offense\_n\_fumbles\_lost\_run}.
+\]
+
+We also define win percentage as
+
+\[
+\text{win\_pct}
+=
+\frac{\text{wins} + 0.5(\text{ties})}{\text{wins}+\text{losses}+\text{ties}}.
+\]
+
+# Descriptive Analysis
+
+Before fitting formal models, it is important to understand the basic distribution of the key variables. Table 1 reports summary statistics for wins, winning-season indicator, passing yards per play, rushing yards per play, turnovers, and score differential. These variables were selected because they align closely with the football concepts of offensive efficiency, ball security, and overall team strength.
+
+```{r summary-table}
+summary_table <- nfl_data %>%
+  summarise(
+    `Wins Mean` = mean(wins, na.rm = TRUE),
+    `Wins SD` = sd(wins, na.rm = TRUE),
+    `Winning Season Proportion` = mean(winning_record, na.rm = TRUE),
+    `Pass Yards/Play Mean` = mean(offense_ave_yards_gained_pass, na.rm = TRUE),
+    `Rush Yards/Play Mean` = mean(offense_ave_yards_gained_run, na.rm = TRUE),
+    `Turnovers Mean` = mean(turnovers, na.rm = TRUE),
+    `Score Differential Mean` = mean(score_differential, na.rm = TRUE)
+  ) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value") %>%
+  mutate(Value = round(Value, 3))
+
+kable(summary_table, caption = "Summary statistics for key variables")
+```
+
+These summary statistics provide an initial picture of team performance in the modern NFL. In particular, the proportion of teams with a winning record helps show how the response variable is distributed, while the means of passing, rushing, and turnovers give a sense of what a typical team season looks like. Because wins and score differential are strongly tied to team success by definition, we expect those quantities to vary meaningfully between winning and losing teams.
+
+To further explore the data, we examine three simple visualizations. The first is a histogram of team wins, which shows how team success is distributed across seasons. The second is a boxplot of average passing yards per play split by winning versus losing teams, which helps assess whether passing efficiency differs across outcome groups. The third is a scatterplot of turnovers versus wins, which illustrates whether turnovers tend to be negatively associated with team success.
+
+```{r hist-wins, fig.height=3.7, fig.width=5.8}
+ggplot(nfl_data, aes(x = wins)) +
+  geom_histogram(bins = 12) +
+  labs(
+    title = "Distribution of Team Wins",
+    x = "Wins",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+
+The histogram of wins shows the spread of team outcomes in the sample. Most teams cluster around the middle of the distribution, while relatively few teams finish with extremely low or extremely high win totals. This supports the idea that wins can be modeled as a continuous response for the linear regression, while also motivating the use of a binary winning-season indicator for the logistic model.
+
+Overall, the descriptive analysis suggests that passing efficiency, turnovers, and score differential are all reasonable variables to consider in the formal models. The exploratory plots also help justify the decision to include both continuous and binary outcome models, since team success can be viewed either through total wins or through whether a team finishes above .500.
+
+# Proposed Models
+
+We are considering three statistical models for the final analysis. Each model addresses team success from a slightly different perspective.
+
+## Model 1: Linear Regression for Wins
+
+The first model treats total wins as a continuous response:
+$$
+\begin{aligned}
+Y_i
+&= \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} \\
+&\quad + \beta_3 X_{3i} + \beta_4 X_{4i} + \varepsilon_i.
+\end{aligned}
+$$
+where $Y_i$ is the number of wins for team $i$, $X_{1i}$ is passing yards per play,
+$X_{2i}$ is rushing yards per play, $X_{3i}$ is turnovers, and $X_{4i}$ is score differential.
+
+This model is useful because it measures how much each predictor is associated with a change in season wins, holding the other variables fixed. It provides an interpretable way to quantify the practical effect of efficiency and ball security on team performance.
+
+## Model 2: Logistic Regression for Winning Season
+
+The second model predicts whether a team has a winning season:
+
+$$
+\begin{aligned}
+\log\left(\frac{P(\text{winning\_record}_i=1)}{1-P(\text{winning\_record}_i=1)}\right)
+&= \beta_0 + \beta_1(\text{pass\_yds\_per\_play}_i) \\
+&\quad + \beta_2(\text{rush\_yds\_per\_play}_i) + \beta_3(\text{turnovers}_i) \\
+&\quad + \beta_4(\text{score\_differential}_i).
+\end{aligned}
+$$
+
+This model aligns closely with our main research question because it directly examines the probability of finishing with a winning record. Coefficients can be interpreted through odds ratios, which makes the model especially useful for discussing whether variables such as passing efficiency or turnovers increase or decrease the odds of team success.
+
+## Model 3: Time-Based Logistic Model for Next Season
+
+Because team performance may persist over time, the third model predicts whether a team will have a winning season **next year,** by incorporating lagged performance measures.
+
+```{r time-series-prep}
+nfl_ts <- nfl_data %>%
+  arrange(team, season) %>%
+  group_by(team) %>%
+  mutate(
+    TimeIndex = row_number(),
+    lag1_win_pct = lag(win_pct, 1),
+    lag2_win_pct = lag(win_pct, 2),
+    lag1_winning_record = lag(winning_record, 1),
+    lag2_winning_record = lag(winning_record, 2),
+    next_winning_record = lead(winning_record, 1),
+    next_win_pct = lead(win_pct, 1)
+  ) %>%
+  ungroup()
+```
+
+The proposed time-based logistic model is
+
+$$
+\begin{aligned}
+\log\left(\frac{P(Y_{it}=1)}{1-P(Y_{it}=1)}\right)
+&= \beta_0 + \beta_1 W_{i,t-1} + \beta_2 W_{i,t-2} \\
+&\quad + \beta_3 P_{it} + \beta_4 R_{it} \\
+&\quad + \beta_5 T_{it} + \beta_6 S_{it}.
+\end{aligned}
+$$
+where $Y_{it}=1$ indicates that team $i$ has a winning record in season $t+1$,
+$W_{i,t-1}$ and $W_{i,t-2}$ are indicators for whether the team had winning records
+in the previous one and two seasons, $P_{it}$ is passing yards per play, $R_{it}$ is
+rushing yards per play, $T_{it}$ is turnovers, and $S_{it}$ is score differential.
+
+This model allows us to examine whether prior success and current-season team quality help predict future success. It is more forward-looking than the first two models and may be useful if we want the project to emphasize prediction in addition to explanation.
+
