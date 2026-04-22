@@ -17,6 +17,27 @@ nfl_data <- read.csv("nfl-team-statistics.csv") %>%
   )
 
 
+# Test for collinearity
+model_vars <- nfl_data %>%
+  select(offense_ave_yards_gained_pass,
+         offense_ave_yards_gained_run,
+         turnovers)
+
+# correlation matrix
+cor(model_vars, use = "complete.obs")
+
+# pairwise scatterplot matrix
+ggpairs(model_vars)
+
+# fit linear model for VIF check
+vif_model <- lm(wins ~ offense_ave_yards_gained_pass +
+                  offense_ave_yards_gained_run +
+                  turnovers,
+                data = nfl_data)
+
+# VIF values
+vif(vif_model)
+
 
 #Linear
 linear_model <- lm(
