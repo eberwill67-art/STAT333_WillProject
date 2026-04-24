@@ -13,7 +13,7 @@ library(knitr)
 ```
 # Research Question and Data
 
-Our research question is: **which team-level performance measures are most strongly associated with NFL success, and which of these measures may help predict whether a team finishes with a winning season?** For this study, a winning season is defined as any season in which a team finishes with at least as many wins as losses, so records such as 8--8 and 8--8--1 are classified as winning seasons.
+Our research question is: **which team-level performance measures are most strongly associated with NFL success, and which of these measures may help predict whether a team finishes with a winning season?** For this study, we define a winning season as any season in which a team finishes with at least as many wins as losses, so records such as 8--8 and 8--8--1 are classified as winning seasons.
 
 The dataset contains NFL team-level seasonal statistics, including offensive production, turnovers, and scoring-related measures. Although the original data begin in 1999, we restrict attention to seasons from **2006 onward** because earlier seasons contain missing values in several variables central to our analysis. This appears to reflect structural missingness rather than random missingness, so removing those early seasons improves the consistency and comparability of the data. In addition, the modern NFL differs meaningfully from earlier periods because of rule changes and a greater emphasis on passing offense.
 
@@ -32,7 +32,7 @@ nfl_data <- read.csv("nfl-team-statistics.csv") %>%
       offense_n_fumbles_lost_run
   )
 ```
-We focus on a smaller group of variables that capture distinct dimensions of team performance while limiting multicollinearity. Passing efficiency is measured by average passing yards gained per play, rushing efficiency by average rushing yards gained per play, and ball security by the turnover variable defined as
+We focus on a smaller group of variables that capture distinct dimensions of team performance while limiting multicollinearity. We measure passing efficiency by using average passing yards gained per play, rushing efficiency by average rushing yards gained per play, and ball security by the turnover variable defined as
 
 \[
 \text{Turnovers}
@@ -54,7 +54,7 @@ We also define win percentage as
 
 # Descriptive Analysis
 
-Before fitting formal models, it is important to understand the basic distribution of the key variables. Table 1 reports summary statistics for wins, winning-season indicator, passing yards per play, rushing yards per play, turnovers, and score differential. These variables were selected because they align closely with the football concepts of offensive efficiency, ball security, and overall team strength.
+Before fitting formal models, it is important to understand the basic distribution of the key variables. Table 1 reports summary statistics for wins, winning-season indicator, passing yards per play, rushing yards per play, turnovers, and score differential. We selected these variables because they align closely with the football concepts of offensive efficiency, ball security, and overall team strength.
 
 ```{r summary-table}
 summary_table <- nfl_data %>%
@@ -73,9 +73,9 @@ summary_table <- nfl_data %>%
 kable(summary_table, caption = "Summary statistics for key variables")
 ```
 
-These summary statistics provide an initial picture of team performance in the modern NFL. In particular, the proportion of teams with a winning record helps show how the response variable is distributed, while the means of passing, rushing, and turnovers give a sense of what a typical team season looks like. Because wins and score differential are strongly tied to team success by definition, we expect those quantities to vary meaningfully between winning and losing teams.
+These summary statistics provide an initial picture of team performance in the modern NFL. In particular, the proportion of teams with a winning record helps show how the response variable is distributed, while the means of passing, rushing, and turnovers give a sense of what a typical team season looks like. Because wins and score differential directly determine team success, we expect those quantities to vary meaningfully between winning and losing teams.
 
-To further explore the data, we examine three simple visualizations. The first is a histogram of team wins, which shows how team success is distributed across seasons. The second is a boxplot of average passing yards per play split by winning versus losing teams, which helps assess whether passing efficiency differs across outcome groups. The third is a scatterplot of turnovers versus wins, which illustrates whether turnovers tend to be negatively associated with team success.
+To further explore the data, we examine a simple visualization. A histogram of team wins, which shows team success distributed across seasons. 
 
 ```{r hist-wins, fig.height=3.7, fig.width=5.8}
 ggplot(nfl_data, aes(x = wins)) +
