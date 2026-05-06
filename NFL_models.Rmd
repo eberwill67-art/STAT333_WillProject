@@ -1,0 +1,159 @@
+---
+title: "NFL Models"
+author: "AJ King & Will Eberhardt"
+date: "2026-05-05"
+output: pdf_document
+---
+```{r}
+library(tidyverse)
+library(knitr)
+nfl_data <- read.csv("https://data.scorenetwork.org/data/nfl-team-statistics.csv")
+str(nfl_data)
+
+nfl_data <- nfl_data %>%
+  filter(season >= 2006)
+
+
+names(nfl_data)
+```
+
+
+
+```{r}
+nfl_model_data <- nfl_data %>%
+  mutate(
+    win_pct = (wins + 0.5 * ties) / (wins + losses + ties),
+    winning_record = ifelse(win_pct >= 0.5, 1, 0),
+    turnovers = offense_n_interceptions +
+      offense_n_fumbles_lost_pass +
+      offense_n_fumbles_lost_run
+  ) %>%
+  arrange(team, season) %>%
+  group_by(team) %>%
+  mutate(
+    next_winning_record = lead(winning_record),
+    last_year_winning_record = lag(winning_record),
+    last_year_wins = lag(wins)
+  ) %>%
+  ungroup() %>%
+  filter(!is.na(next_winning_record))
+
+
+
+```
+
+```{r}
+summary(nfl_model_data$next_winning_record)
+table(nfl_model_data$next_winning_record)
+
+```
+
+```{r}
+model1 <- glm(
+  next_winning_record ~ winning_record,
+  data = nfl_model_data,
+  family = binomial
+)
+
+summary(model1)
+
+```
+
+```{r}
+model2 <- glm(
+  next_winning_record ~ winning_record +
+    offense_ave_yards_gained_pass +
+    offense_ave_yards_gained_run +
+    turnovers,
+  data = nfl_model_data,
+  family = binomial
+)
+
+summary(model2)
+```
+
+```{r}
+model3 <- glm(
+  next_winning_record ~ winning_record +
+    offense_ave_yards_gained_pass +
+    offense_ave_yards_gained_run +
+    turnovers +
+    score_differential,
+  data = nfl_model_data,
+  family = binomial
+)
+
+summary(model3)
+```
+
+```{r}
+AIC(model1, model2, model3)
+```
+
+```{r}
+model_comparison <- data.frame(
+  Model = c("Model 1: Previous winning record",
+            "Model 2: Offense + turnovers",
+            "Model 3: Offense + turnovers + score differential"),
+  AIC = c(AIC(model1), AIC(model2), AIC(model3))
+)
+
+kable(
+  model_comparison,
+  caption = "Model comparison using AIC. Lower AIC indicates a better-fitting model."
+)
+```
+
+```{r}
+odds_ratios <- data.frame(
+  Variable = names(coef(model3)),
+  Estimate = coef(model3),
+  Odds_Ratio = exp(coef(model3))
+)
+
+kable(
+  odds_ratios,
+  digits = 3,
+  caption = "Estimated coefficients and odds ratios for Model 3."
+)
+```
+
+```{r}
+nfl_model_data <- nfl_model_data %>%
+  mutate(
+    pred_prob_m1 = predict(model1, type = "response"),
+    pred_class_m1 = ifelse(pred_prob_m1 >= 0.5, 1, 0),
+    
+    pred_prob_m2 = predict(model2, type = "response"),
+    pred_class_m2 = ifelse(pred_prob_m2 >= 0.5, 1, 0),
+    
+    pred_prob_m3 = predict(model3, type = "response"),
+    pred_class_m3 = ifelse(pred_prob_m3 >= 0.5, 1, 0)
+  )
+
+accuracy_table <- data.frame(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  Accuracy = c(
+    mean(nfl_model_data$pred_class_m1 == nfl_model_data$next_winning_record),
+    mean(nfl_model_data$pred_class_m2 == nfl_model_data$next_winning_record),
+    mean(nfl_model_data$pred_class_m3 == nfl_model_data$next_winning_record)
+  )
+)
+
+kable(
+  accuracy_table,
+  digits = 3,
+  caption = "Classification accuracy for each model using a 0.50 probability cutoff."
+)
+```
+
+```{r}
+ggplot(nfl_model_data, aes(x = last_year_wins, y = wins)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Current Season Wins vs. Previous Season Wins",
+    x = "Previous Season Wins",
+    y = "Current Season Wins"
+  )
+```
