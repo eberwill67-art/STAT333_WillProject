@@ -4,9 +4,10 @@ author: "AJ King & Will Eberhardt"
 date: "2026-05-05"
 output: pdf_document
 ---
-```{r}
+```{r, include = FALSE}
 library(tidyverse)
 library(knitr)
+knitr::opts_knit$set(root.dir = "/Users/wille/Desktop/STATS/STAT333_WillProject")
 nfl_data <- read.csv("https://data.scorenetwork.org/data/nfl-team-statistics.csv")
 str(nfl_data)
 
@@ -24,9 +25,13 @@ nfl_model_data <- nfl_data %>%
   mutate(
     win_pct = (wins + 0.5 * ties) / (wins + losses + ties),
     winning_record = ifelse(win_pct >= 0.5, 1, 0),
-    turnovers = offense_n_interceptions +
+    turnovers_bad = offense_n_interceptions +
       offense_n_fumbles_lost_pass +
-      offense_n_fumbles_lost_run
+      offense_n_fumbles_lost_run,
+    turnovers_good = defense_n_interceptions +
+      defense_n_fumbles_lost_pass +
+      defense_n_fumbles_lost_run,
+    turnover_diff = turnovers_bad - turnovers_good
   ) %>%
   arrange(team, season) %>%
   group_by(team) %>%
@@ -41,16 +46,16 @@ nfl_model_data <- nfl_data %>%
 
 
 ```
-
+This makes winning records for win count over 9. Makes a turnover statistic.
 ```{r}
 summary(nfl_model_data$next_winning_record)
 table(nfl_model_data$next_winning_record)
 
 ```
-
+Now we get to the models
 ```{r}
 model1 <- glm(
-  next_winning_record ~ winning_record,
+  next_winning_record ~ win_pct,
   data = nfl_model_data,
   family = binomial
 )
@@ -61,10 +66,10 @@ summary(model1)
 
 ```{r}
 model2 <- glm(
-  next_winning_record ~ winning_record +
+  next_winning_record ~ win_pct +
     offense_ave_yards_gained_pass +
     offense_ave_yards_gained_run +
-    turnovers,
+    turnover_diff,
   data = nfl_model_data,
   family = binomial
 )
@@ -74,16 +79,64 @@ summary(model2)
 
 ```{r}
 model3 <- glm(
-  next_winning_record ~ winning_record +
-    offense_ave_yards_gained_pass +
-    offense_ave_yards_gained_run +
-    turnovers +
+  next_winning_record ~ win_pct +
+    offense_n_plays_pass +
+    turnover_diff +
     score_differential,
   data = nfl_model_data,
   family = binomial
 )
 
 summary(model3)
+```
+
+
+```{r}
+nfl_model_data <- nfl_model_data %>%
+  mutate(
+    pred_prob_model1 = predict(model1, type = "response"),
+    pred_class_model1 = ifelse(pred_prob_model1 >= 0.5, 1, 0),
+    
+    pred_prob_model2 = predict(model2, type = "response"),
+    pred_class_model2 = ifelse(pred_prob_model2 >= 0.5, 1, 0),
+    
+    pred_prob_model3 = predict(model3, type = "response"),
+    pred_class_model3 = ifelse(pred_prob_model3 >= 0.5, 1, 0)
+  )
+
+```
+
+```{r}
+accuracy_model1 <- mean(nfl_model_data$pred_class_model1 == nfl_model_data$next_winning_record)
+accuracy_model2 <- mean(nfl_model_data$pred_class_model2 == nfl_model_data$next_winning_record)
+accuracy_model3 <- mean(nfl_model_data$pred_class_model3 == nfl_model_data$next_winning_record)
+
+accuracy_table <- data.frame(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  Accuracy = c(accuracy_model1, accuracy_model2, accuracy_model3)
+)
+
+kable(accuracy_table)
+
+```
+
+
+```{r}
+table(
+  Predicted = nfl_model_data$pred_class_model1,
+  Actual = nfl_model_data$next_winning_record
+)
+
+table(
+  Predicted = nfl_model_data$pred_class_model2,
+  Actual = nfl_model_data$next_winning_record
+)
+
+table(
+  Predicted = nfl_model_data$pred_class_model3,
+  Actual = nfl_model_data$next_winning_record
+)
+
 ```
 
 ```{r}
@@ -155,5 +208,30 @@ ggplot(nfl_model_data, aes(x = last_year_wins, y = wins)) +
     title = "Current Season Wins vs. Previous Season Wins",
     x = "Previous Season Wins",
     y = "Current Season Wins"
+  )
+```
+
+
+```{r}
+actual_2023 <- read.csv("/Users/wille/Desktop/STATS/STAT333_WillProject/2023NFL_WL.csv") %>%
+
+  select(season, team, wins, losses, ties) %>%
+  mutate(
+    actual_win_pct_2023 = (wins + 0.5 * ties) / (wins + losses + ties),
+    actual_winning_record_2023 = ifelse(actual_win_pct_2023 >= 0.5, 1, 0)
+  )
+
+
+```
+
+
+```{r}
+predict_2023_data <- nfl_data %>%
+  filter(season == 2022) %>%
+  mutate(
+    win_pct = (wins + 0.5 * ties) / (wins + losses + ties),
+    turnovers = offense_n_interceptions +
+      offense_n_fumbles_lost_pass +
+      offense_n_fumbles_lost_run
   )
 ```
