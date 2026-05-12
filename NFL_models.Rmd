@@ -80,7 +80,7 @@ summary(model2)
 ```{r}
 model3 <- glm(
   next_winning_record ~ win_pct +
-    offense_n_plays_pass +
+    offense_ave_air_yards+
     turnover_diff +
     score_differential,
   data = nfl_model_data,
