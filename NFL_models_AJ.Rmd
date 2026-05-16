@@ -1,0 +1,392 @@
+---
+title: "NFL Models"
+author: "AJ King & Will Eberhardt"
+date: "2026-05-05"
+output: pdf_document
+---
+```{r, include = FALSE}
+library(tidyverse)
+library(knitr)
+knitr::opts_knit$set(root.dir = "/Users/wille/Desktop/STATS/STAT333_WillProject")
+nfl_data <- read.csv("https://data.scorenetwork.org/data/nfl-team-statistics.csv")
+str(nfl_data)
+
+nfl_data <- nfl_data %>%
+  filter(season >= 2006)
+
+
+names(nfl_data)
+```
+
+
+
+```{r}
+nfl_model_data <- nfl_data %>%
+  mutate(
+    win_pct = (wins + 0.5 * ties) / (wins + losses + ties),
+    winning_record = ifelse(win_pct >= 0.5, 1, 0),
+    turnovers_bad = offense_n_interceptions +
+      offense_n_fumbles_lost_pass +
+      offense_n_fumbles_lost_run,
+    turnovers_good = defense_n_interceptions +
+      defense_n_fumbles_lost_pass +
+      defense_n_fumbles_lost_run,
+    turnover_diff = turnovers_bad - turnovers_good
+  ) %>%
+  arrange(team, season) %>%
+  group_by(team) %>%
+  mutate(
+    next_winning_record = lead(winning_record),
+    last_year_winning_record = lag(winning_record),
+    last_year_wins = lag(wins)
+  ) %>%
+  ungroup() %>%
+  filter(!is.na(next_winning_record))
+
+library(dplyr)
+library(knitr)
+library(tidyr)
+
+summary_table <- nfl_model_data %>%
+  select(
+    win_pct,
+    last_year_winning_record,
+    last_year_wins,
+    turnover_diff,
+    score_differential,
+    next_winning_record
+  ) %>%
+  summarise(
+    across(
+      everything(),
+      list(
+        Mean = ~mean(.x, na.rm = TRUE),
+        SD = ~sd(.x, na.rm = TRUE),
+        Min = ~min(.x, na.rm = TRUE),
+        Max = ~max(.x, na.rm = TRUE)
+      )
+    )
+  ) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = c("Variable", ".value"),
+    names_sep = "_(?=[^_]+$)"
+  ) %>%
+  mutate(
+    Variable = case_when(
+      Variable == "win_pct" ~ "Winning Percentage",
+      Variable == "last_year_winning_record" ~ "Winning Record Last Season",
+      Variable == "last_year_wins" ~ "Wins Last Season",
+      Variable == "turnover_diff" ~ "Turnover Difference",
+      Variable == "score_differential" ~ "Score Differential",
+      Variable == "next_winning_record" ~ "Winning Record Next Season",
+      TRUE ~ Variable
+    ),
+    across(where(is.numeric), ~round(.x, 3))
+  )
+
+kable(
+  summary_table,
+  caption = "Summary statistics for key NFL model variables.",
+  col.names = c("Variable", "Mean", "SD", "Min", "Max"),
+  align = "lcccc"
+)
+
+```
+This makes winning records for win count over 9. Makes a turnover statistic.
+```{r}
+summary(nfl_model_data$next_winning_record)
+table(nfl_model_data$next_winning_record)
+
+```
+Now we get to the models
+```{r}
+model1 <- glm(
+  next_winning_record ~ win_pct,
+  data = nfl_model_data,
+  family = binomial
+)
+
+summary(model1)
+
+```
+
+```{r}
+model2 <- glm(
+  next_winning_record ~ win_pct +
+    offense_ave_air_yards +
+    turnover_diff,
+  data = nfl_model_data,
+  family = binomial
+)
+
+summary(model2)
+```
+
+```{r}
+model3 <- glm(
+  next_winning_record ~ win_pct +
+    offense_ave_air_yards+
+    turnover_diff +
+    score_differential,
+  data = nfl_model_data,
+  family = binomial
+)
+
+summary(model3)
+```
+
+
+```{r}
+nfl_model_data <- nfl_model_data %>%
+  mutate(
+    pred_prob_model1 = predict(model1, type = "response"),
+    pred_class_model1 = ifelse(pred_prob_model1 >= 0.5, 1, 0),
+    
+    pred_prob_model2 = predict(model2, type = "response"),
+    pred_class_model2 = ifelse(pred_prob_model2 >= 0.5, 1, 0),
+    
+    pred_prob_model3 = predict(model3, type = "response"),
+    pred_class_model3 = ifelse(pred_prob_model3 >= 0.5, 1, 0)
+  )
+
+```
+
+```{r}
+accuracy_model1 <- mean(nfl_model_data$pred_class_model1 == nfl_model_data$next_winning_record)
+accuracy_model2 <- mean(nfl_model_data$pred_class_model2 == nfl_model_data$next_winning_record)
+accuracy_model3 <- mean(nfl_model_data$pred_class_model3 == nfl_model_data$next_winning_record)
+
+accuracy_table <- data.frame(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  Accuracy = c(accuracy_model1, accuracy_model2, accuracy_model3)
+)
+
+kable(accuracy_table)
+
+```
+
+
+
+```{r}
+accuracy_graph_data <- data.frame(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  Accuracy_Percent = c(62.1, 63.1, 65.2)
+)
+
+accuracy_graph_data$Model <- factor(
+  accuracy_graph_data$Model,
+  levels = c("Model 1", "Model 2", "Model 3")
+)
+
+accuracy_plot <- ggplot(
+  accuracy_graph_data,
+  aes(x = Model, y = Accuracy_Percent, fill = Model)
+) +
+  geom_col(width = 0.65) +
+  geom_text(
+    aes(label = paste0(Accuracy_Percent, "%")),
+    vjust = -0.5,
+    size = 5
+  ) +
+  coord_cartesian(ylim = c(50, 70)) +
+  scale_y_continuous(
+    breaks = seq(50, 70, 5),
+    labels = function(x) paste0(x, "%")
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Model 1" = "#d2b48c",
+      "Model 2" = "#a97142",
+      "Model 3" = "#5c3317"
+    )
+  ) +
+  labs(
+    title = "Model Accuracy Comparison",
+    x = "Model",
+    y = "Accuracy"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+
+accuracy_plot
+```
+
+```{r}
+table(
+  Predicted = nfl_model_data$pred_class_model1,
+  Actual = nfl_model_data$next_winning_record
+)
+
+table(
+  Predicted = nfl_model_data$pred_class_model2,
+  Actual = nfl_model_data$next_winning_record
+)
+
+table(
+  Predicted = nfl_model_data$pred_class_model3,
+  Actual = nfl_model_data$next_winning_record
+)
+
+```
+
+```{r}
+AIC(model1, model2, model3)
+```
+
+```{r}
+model_comparison <- data.frame(
+  Model = c("Model 1: Previous winning record",
+            "Model 2: Offense + turnovers",
+            "Model 3: Offense + turnovers + score differential"),
+  AIC = c(AIC(model1), AIC(model2), AIC(model3))
+)
+
+kable(
+  model_comparison,
+  caption = "Model comparison using AIC. Lower AIC indicates a better-fitting model."
+)
+```
+
+```{r}
+odds_ratios <- data.frame(
+  Variable = names(coef(model3)),
+  Estimate = coef(model3)
+)
+
+kable(
+  odds_ratios,
+  digits = 3,
+  caption = "Estimated coefficient for Model 3."
+)
+```
+
+```{r}
+nfl_model_data <- nfl_model_data %>%
+  mutate(
+    pred_prob_m1 = predict(model1, type = "response"),
+    pred_class_m1 = ifelse(pred_prob_m1 >= 0.5, 1, 0),
+    
+    pred_prob_m2 = predict(model2, type = "response"),
+    pred_class_m2 = ifelse(pred_prob_m2 >= 0.5, 1, 0),
+    
+    pred_prob_m3 = predict(model3, type = "response"),
+    pred_class_m3 = ifelse(pred_prob_m3 >= 0.5, 1, 0)
+  )
+
+accuracy_table <- data.frame(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  Accuracy = c(
+    mean(nfl_model_data$pred_class_m1 == nfl_model_data$next_winning_record),
+    mean(nfl_model_data$pred_class_m2 == nfl_model_data$next_winning_record),
+    mean(nfl_model_data$pred_class_m3 == nfl_model_data$next_winning_record)
+  )
+)
+
+kable(
+  accuracy_table,
+  digits = 3,
+  caption = "Classification accuracy for each model using a 0.50 probability cutoff."
+)
+```
+
+```{r}
+ggplot(nfl_model_data, aes(x = last_year_wins, y = wins)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Current Season Wins vs. Previous Season Wins",
+    x = "Previous Season Wins",
+    y = "Current Season Wins"
+  )
+```
+
+
+```{r}
+actual_2023 <- read.csv("/Users/wille/Desktop/STATS/STAT333_WillProject/2023NFL_WL.csv") %>%
+
+  select(season, team, wins, losses, ties) %>%
+  mutate(
+    actual_win_pct_2023 = (wins + 0.5 * ties) / (wins + losses + ties),
+    actual_winning_record_2023 = ifelse(actual_win_pct_2023 >= 0.5, 1, 0)
+  )
+
+
+```
+
+
+```{r}
+actual_2023 <- read.csv("/Users/wille/Desktop/STATS/STAT333_WillProject/2023NFL_WL.csv") %>%
+  select(season, team, wins, losses, ties) %>%
+  mutate(
+    actual_win_pct_2023 = (wins + 0.5 * ties) / (wins + losses + ties),
+    actual_winning_record_2023 = ifelse(actual_win_pct_2023 >= 0.5, 1, 0)
+  )
+
+predict_2023_data <- nfl_data %>%
+  filter(season == 2022) %>%
+  mutate(
+    win_pct = (wins + 0.5 * ties) / (wins + losses + ties),
+    turnovers_bad = offense_n_interceptions +
+      offense_n_fumbles_lost_pass +
+      offense_n_fumbles_lost_run,
+    turnovers_good = defense_n_interceptions +
+      defense_n_fumbles_lost_pass +
+      defense_n_fumbles_lost_run,
+    turnover_diff = turnovers_bad - turnovers_good
+  ) %>%
+  mutate(
+    pred_prob_2023 = predict(model3, newdata = ., type = "response"),
+    predicted_winning_record_2023 = ifelse(pred_prob_2023 >= 0.5, 1, 0)
+  ) %>%
+  select(team, pred_prob_2023, predicted_winning_record_2023)
+
+prediction_2023_results <- predict_2023_data %>%
+  left_join(actual_2023, by = "team") %>%
+  mutate(
+    Prediction_Result = ifelse(
+      predicted_winning_record_2023 == actual_winning_record_2023,
+      "Correct",
+      "Incorrect"
+    )
+  )
+print(prediction_2023_results)
+```
+
+
+
+```{r}
+prediction_summary <- prediction_2023_results %>%
+  count(Prediction_Result) %>%
+  mutate(
+    Percent = n / sum(n) * 100
+  )
+
+ggplot(prediction_summary, aes(x = Prediction_Result, y = n, fill = Prediction_Result)) +
+  geom_col(width = 0.65) +
+  geom_text(
+    aes(label = paste0(n, " teams\n", round(Percent, 1), "%")),
+    vjust = -0.3,
+    size = 5
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Correct" = "#5c3317",
+      "Incorrect" = "#d2b48c"
+    )
+  ) +
+  labs(
+    title = "2023 Prediction Results Using Model 3",
+    x = "",
+    y = "Number of Teams"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+
+```
